@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DesignSurface">
+    <option name="filePathToZoomLevelMap">
+      <map>
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/activity_bieudo_temhum.xml" value="0.25416666666666665" />
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/activity_hengio.xml" value="0.536" />
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/activity_main.xml" value="0.264" />
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/activity_main_dangnhap.xml" value="0.4" />
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/content_hengiochoan.xml" value="0.4" />
+        <entry key="..\:/SANSLAB_TRAINING/Android/Chan_nuoi_thong_minh/app/src/main/res/layout/content_ngaygiochoan.xml" value="0.253125" />
+      </map>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" default="true" project-jdk-name="JDK" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/build/classes" />
+  </component>
+  <component name="ProjectType">
+    <option name="id" value="Android" />
+  </component>
+</project>
