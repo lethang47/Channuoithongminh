@@ -15,24 +15,24 @@
 #define phunsuong D6
 #define nhietdo_doam D5
 #define DHTTYPE DHT11
-#define rxPin D7
-#define txPin D8
+#define rxPin_esp D7
+#define txPin_esp D8
 
 DHT dht(nhietdo_doam, DHTTYPE);
-SoftwareSerial sim800(rxPin, txPin);
+SoftwareSerial esp(rxPin_esp, txPin_esp);
 WiFiUDP udp;
 NTPClient realtime(udp);
 
-SimpleTimer timer_switch, timer_dht11, timer_thietlap;
-int timerid_switch, timerid_dht11, timerid_thietlap;
+SimpleTimer timer_switch, timer_dht11, timer_thietlap, timer_esp;
+int timerid_switch, timerid_dht11, timerid_thietlap, timerid_esp;
 String smsStatus, senderNumber, receivedDate, msg, indexmess;
 unsigned long previousMillis = 0;
+String data_receive = "";
+bool stringComplete = false;
 
-char *ssid = "D-Link";
-char *password = "0988622764";
-String host = "192.168.0.13";
-const String PHONE = "+84971098681";
-int kiemtra = 1;
+char *ssid = "AndroidAP";
+char *password = "123456789";
+String host = "192.168.43.13";
 
 void setup() {
   // put your setup code here, to run once:
@@ -44,8 +44,7 @@ void setup() {
   dht.begin();
   Serial.begin(115200);
 
-  sim800.begin(9600);
-  sim800.println("AT+CMGF=1");
+  esp.begin(9600);
 
   Serial.println();
   Serial.print("Connecting to: ");
@@ -66,27 +65,98 @@ void setup() {
   timerid_switch = timer_switch.setInterval(1000, switch_);
   timerid_dht11 = timer_dht11.setInterval(6000, insert_data_dht11);
   timerid_thietlap = timer_thietlap.setInterval(500, thietlap);
+  //timerid_esp = timer_esp.setInterval(1000, check_esp);
 }
 
 void loop() {
-
-
-  //timer_thietlap.run();
-  timer_switch.run();
-  
-
-  //Module sim800L
-  while (sim800.available()) {
-    parseData(sim800.readString());
-  }
-  //  while (Serial.available())  {
-  //    sim800.println(Serial.readString());
-  //  }
-
-  //  Serial.println(get_realtime());
-  //  delay(1000);
+  //  timer_thietlap.run();
+  //  timer_switch.run();
+  //  timer_dht11.run();
+  //delay_(6000);
+  insert_data_dht11();
+  //delay_(1000);
+  switch_();
+  //delay_(500);
+  thietlap();
+  check_esp();
 }
+void check_esp() {
 
+  while (esp.available()) {
+    char inChar = (char)esp.read();
+    //String instring = (String)inChar;
+    data_receive += inChar;
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+  if (stringComplete) {
+    Serial.println(data_receive);
+    data_receive.trim();
+    String soluong = data_receive.substring(7, data_receive.length());
+    String check_data_choan = data_receive.substring(0, 6);
+    //Serial.println(data_receive.length());
+    if (check_data_choan == "cho an"){
+      insert_choan(soluong);
+    } else if (data_receive == "bat quat") {
+      Serial.println(data_receive);
+      digitalWrite(quat, HIGH);
+      update_switch("1", "1");
+    } else if (data_receive == "bat dieu hoa") {
+      digitalWrite(dieuhoa, HIGH);
+      update_switch("1", "2");
+    }  else if (data_receive == "bat may suoi") {
+      digitalWrite(maysuoi, HIGH);
+      update_switch("1", "3");
+    } else if (data_receive == "bat den") {
+      digitalWrite(den, HIGH);
+      update_switch("1", "4");
+    } else if (data_receive == "bat phun suong") {
+      digitalWrite(phunsuong, HIGH);
+      update_switch("1", "5");
+    } else if (data_receive == "tat quat") {
+      digitalWrite(quat, LOW);
+      update_switch("0", "1");
+    } else if (data_receive == "tat dieu hoa") {
+      digitalWrite(dieuhoa, LOW);
+      update_switch("0", "2");
+    } else if (data_receive == "tat may suoi") {
+      digitalWrite(maysuoi, LOW);
+      update_switch("0", "3");
+    } else if (data_receive == "tat den") {
+      digitalWrite(den, LOW);
+      update_switch("0", "4");
+    } else if (data_receive == "tat phun suong") {
+      digitalWrite(phunsuong, LOW);
+      update_switch("0", "5");
+    } else if (data_receive == "trang thai") {
+      String tt_quat, tt_dieuhoa, tt_maysuoi, tt_den, tt_phunsuong;
+      if (digitalRead(quat) == 1) tt_quat = "bat"; else tt_quat = "tat";
+      if (digitalRead(dieuhoa) == 1) tt_dieuhoa = "bat"; else tt_dieuhoa = "tat";
+      if (digitalRead(maysuoi) == 1) tt_maysuoi = "bat"; else tt_maysuoi = "tat";
+      if (digitalRead(den) == 1) tt_den = "bat"; else tt_den = "tat";
+      if (digitalRead(phunsuong) == 1) tt_phunsuong = "bat"; else tt_phunsuong = "tat";
+      String data_send = "Quat: " + tt_quat + " " + "Dieu hoa: " + tt_dieuhoa + " "
+                         + "May suoi: " + tt_maysuoi + " " + "Den: " + tt_den + " " + "Phun suong: " + tt_phunsuong;
+      send_esp(data_send);
+    } else if (data_receive == "nhiet do, do am") {
+      float temperature = dht.readTemperature();
+      float humidity = dht.readHumidity();
+      if (isnan(temperature) || isnan(humidity)) {
+        Serial.println("Lỗi đọc DHT11");
+      } else {
+        String nhietdo = "";
+        nhietdo.concat(temperature);
+        String doam = "";
+        doam.concat(humidity);
+        String data_send = "Nhiet do: " + nhietdo + "/" + "Do am: " + doam;
+        send_esp(data_send);
+      }
+    }
+    data_receive = "";
+    stringComplete = false;
+  }
+}
 void switch_() {
   String url = "http://" + host + "/esp8266_channuoithongminh/getdata_switch.php";
   String data_quat = getdata(url, "1");
@@ -107,6 +177,7 @@ void switch_() {
 }
 
 void insert_data_dht11() {
+  delay(3000);
   String url = "http://" + host + "/esp8266_channuoithongminh/insert_dht11_data.php";
   float temperature = dht.readTemperature();
   float humidity = dht.readHumidity();
@@ -181,160 +252,6 @@ void thietlap() {
     }
   }
 }
-void parseData(String buff) {
-  
-  Serial.println(buff);
-
-  unsigned int len, index;
-  //--------------------------------------------------------------------
-  //Xóa lệnh AT từ chuỗi trả về.
-  index = buff.indexOf("\r");
-  buff.remove(0, index + 2);
-  buff.trim();
-  //--------------------------------------------------------------------
-
-  //--------------------------------------------------------------------
-  if (buff != "OK") {
-    index = buff.indexOf(":");
-    String cmd = buff.substring(0, index);
-    cmd.trim();
-
-    buff.remove(0, index + 2);
-
-    //____________________________________________________________
-    if (cmd == "+CMTI") {
-      //timer_thietlap.disable(timerid_thietlap);
-      //timer_switch.disable(timerid_switch);
-      //Lấy vị trí lưu tin nhắn
-      index = buff.indexOf(",");
-      String temp = buff.substring(index + 1, buff.length());
-      indexmess = temp;
-      temp = "AT+CMGR=" + temp + "\r";
-      //Lấy giá trị tin nhắn
-      sim800.println(temp);
-    }
-    //____________________________________________________________
-    else if (cmd == "+CMGR") {
-      extractSms(buff);
-      Serial.println(msg);
-      String senderNumbernew = senderNumber.substring(0, 12);
-      Serial.println(senderNumbernew);
-      if (senderNumbernew == PHONE && msg == "nhiet do, do am") {
-        //Reply("thang");
-        float temperature = dht.readTemperature();
-        float humidity = dht.readHumidity();
-        String nhietdo = "";
-        nhietdo.concat(temperature);
-        String doam = "";
-        doam.concat(humidity);
-        if (isnan(temperature) || isnan(humidity)) {
-          //Serial.println("Lỗi đọc DHT11");
-        } else {
-          String data_send = "Nhiet do: " + nhietdo + "\n" + "Do am: " + doam;
-          Reply(data_send);
-        }
-      } else if (senderNumbernew == PHONE && msg == "bat quat") {
-        digitalWrite(quat, HIGH);
-        //update_switch("1", "1");
-        Reply("Quat da bat");
-      } else if (senderNumbernew == PHONE && msg == "bat dieu hoa") {
-        digitalWrite(dieuhoa, HIGH);
-        update_switch("1", "2");
-        Reply("Dieu hoa da bat");
-      } else if (senderNumbernew == PHONE && msg == "bat may suoi") {
-        digitalWrite(maysuoi, HIGH);
-        update_switch("1", "3");
-        Reply("May suoi da bat");
-      } else if (senderNumbernew == PHONE && msg == "bat den") {
-        digitalWrite(den, HIGH);
-        update_switch("1", "4");
-        Reply("Den da bat");
-      } else if (senderNumbernew == PHONE && msg == "bat phun suong") {
-        digitalWrite(phunsuong, HIGH);
-        update_switch("1", "5");
-        Reply("Phun suong da bat");
-      } else if (senderNumbernew == PHONE && msg == "tat quat") {
-        digitalWrite(quat, LOW);
-        update_switch("0", "1");
-        Reply("Quat da tat");
-      } else if (senderNumbernew == PHONE && msg == "tat dieu hoa") {
-        digitalWrite(dieuhoa, LOW);
-        update_switch("0", "2");
-        Reply("Dieu hoa da tat");
-      } else if (senderNumbernew == PHONE && msg == "tat may suoi") {
-        digitalWrite(maysuoi, LOW);
-        update_switch("0", "3");
-        Reply("May suoi da tat");
-      } else if (senderNumbernew == PHONE && msg == "tat den") {
-        digitalWrite(den, LOW);
-        update_switch("0", "4");
-        Reply("Den da tat");
-      } else if (senderNumbernew == PHONE && msg == "tat phun suong") {
-        digitalWrite(phunsuong, LOW);
-        update_switch("0", "5");
-        Reply("Phun suong da tat");
-      } else if (senderNumbernew == PHONE && msg == "trang thai") {
-        String tt_quat, tt_dieuhoa, tt_maysuoi, tt_den, tt_phunsuong;
-        if (digitalRead(quat) == 1) tt_quat = "bat"; else tt_quat = "tat";
-        if (digitalRead(dieuhoa) == 1) tt_dieuhoa = "bat"; else tt_dieuhoa = "tat";
-        if (digitalRead(maysuoi) == 1) tt_maysuoi = "bat"; else tt_maysuoi = "tat";
-        if (digitalRead(den) == 1) tt_den = "bat"; else tt_den = "tat";
-        if (digitalRead(phunsuong) == 1) tt_phunsuong = "bat"; else tt_phunsuong = "tat";
-        String data_send = "Quat: " + tt_quat + "\n" + "Dieu hoa: " + tt_dieuhoa + "\n"
-                           + "May suoi: " + tt_maysuoi + "\n" + "Den: " + tt_den + "\n" + "Phun suong: " + tt_phunsuong;
-        Reply(data_send);
-      }
-
-    }
-    //____________________________________________________________
-    //--------------------------------------------------------------------
-  }
-
-  
-}
-void Reply(String text)
-{
-  if (text == "") {
-    return;
-  }
-  Serial.println(text);
-  sim800.print("AT+CMGDA=\"");
-  sim800.println("DEL ALL\"");
-  delay_(100);
-  sim800.print("AT+CMGF=1\r");
-  delay_(1000);
-  sim800.print("AT+CMGS=\"" + PHONE + "\"\r");
-  delay_(1000);
-  sim800.print(text);
-  delay_(100);
-  sim800.write(0x1A);
-  delay_(1000);
-  Serial.println("Da gui tin nhan thanh cong");
-  //  sim800.print("AT+CMGF=1\r");
-  //  delay_(100);
-}
-void extractSms(String buff) {
-  unsigned int index;
-
-  index = buff.indexOf(",");
-  smsStatus = buff.substring(1, index - 1);
-  buff.remove(0, index + 2);
-
-  senderNumber = buff.substring(0, 13);
-  buff.remove(0, 19);
-
-  receivedDate = buff.substring(0, 20);
-  buff.remove(0, buff.indexOf("\r"));
-  buff.trim();
-
-  index = buff.indexOf("\n\r");
-  buff = buff.substring(0, index);
-  buff.trim();
-  msg = buff;
-  buff = "";
-  msg.toLowerCase();
-  Serial.println(msg);
-}
 String get_realtime() {
   while (!realtime.update()) {
     realtime.forceUpdate();
@@ -361,7 +278,7 @@ String getdata(String url, String id) {
   String dataGet = http.getString();
   return dataGet;
 }
-void xuly_data(float *array, String data_) {
+void xuly_data(float * array, String data_) {
   data_ = data_ + " ";
   String st = "";
   int index = 0;
@@ -383,4 +300,37 @@ void delay_(int number_mi) {
       break;
     }
   }
+}
+void send_esp(String noidung) {
+  esp.println(noidung);
+  esp.flush();
+}
+String receive_esp() {
+  String inputString = "";
+  bool stringComplete = false;
+  while (esp.available()) {
+    char inChar = (char)esp.read();
+    inputString += inChar;
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+  if (stringComplete) {
+    return inputString;
+  }
+}
+void insert_choan(String soluong) {
+  String url = "http://" + host + "/esp8266_channuoithongminh/insert_choan.php";
+  WiFiClient client;
+  if (!client.connect(host, 80)) {
+    Serial.println("connection failed");
+    return;
+  }
+  client.print(String("GET " + url + "?") +
+               ("&soluong=") + soluong +
+               " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" +
+               "Connection: close\r\n\r\n");
+  client.stop();
+
 }

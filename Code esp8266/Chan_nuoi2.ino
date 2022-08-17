@@ -1,6 +1,4 @@
 #include <ArduinoJson.h>
-
-
 #include "DHT.h"
 #include <Servo.h>
 #include <HX711.h>
@@ -20,8 +18,6 @@
 #define scl D1
 #define nhietdo_doam D4
 #define DHTTYPE DHT11
-#define rxPin D7
-#define txPin D8
 
 Servo myservo;
 HX711 scale_;
@@ -29,7 +25,6 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 DHT dht(nhietdo_doam, DHTTYPE);
 WiFiUDP udp;
 NTPClient realtime(udp);
-SoftwareSerial sim800(rxPin, txPin);
 
 char *ssid = "AndroidAP";
 char *password = "123456789";
@@ -38,7 +33,6 @@ String url_choan = "http://" + host + "/esp8266_channuoithongminh/getdata_choan.
 String url_choan_cuoi = "http://" + host + "/esp8266_channuoithongminh/getdata_choan_cuoi.php";
 String url_hengio = "http://" + host + "/esp8266_channuoithongminh/getdata_hengio.php";
 int soluong_mysql;
-const String PHONE = "+84971098681";
 
 SimpleTimer timer;
 int timerid1, timeridhengio, timeridcheck;
@@ -48,10 +42,7 @@ void setup() {
   // put your setup code here, to run once:
   myservo.attach(servoPin);
   scale_.begin(DOUT, CLK);
-
   Wire.begin(sda, scl);
-  sim800.begin(9600);
-  sim800.println("AT+CMGF=1");
   lcd.clear();
   lcd.init();
   lcd.backlight();
@@ -81,23 +72,15 @@ void setup() {
   timerid1 = timer.setInterval(1000, hienthinhietdo_doam_thoigian);
   timeridhengio = timer.setInterval(1000, hengiochoan);
   timeridcheck = timer.setInterval(1000, check_);
-  //delay(6000);
-  //choan(200);
-
   soluong_mysql = get_soluong_json(getdata(url_choan));
-  //xoa_hengio("23");
-  //Serial.println(soluong_mysql);
-  //json(getdata(url_hengio));
-  //check_choan();
 }
 
 
 void loop() {
-  timer.run();
-  //Module sim800L
-  while (sim800.available()) {
-    parseData(sim800.readString());
-  }
+  //timer.run();
+  hienthinhietdo_doam_thoigian();
+  hengiochoan();
+  check_();
 }
 int get_cannang() {
   float nang;
@@ -188,7 +171,7 @@ void hienthinhietdo_doam_thoigian() {
   int temperature_ = round(temperature);
   int humidity_ = round(humidity);
   if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("Failed to read DHT11");
+    //Serial.println("Failed to read DHT11");
   } else {
     lcd.setCursor(0, 0);
     String tem, hum;
@@ -234,22 +217,6 @@ int get_soluong_mysql(String data_) {
   }
   return index;
 }
-//void json(String data_) {
-//  char txt[9000];
-//  DynamicJsonBuffer jsonBuffer(data_.length() + 1);
-//  data_.toCharArray(txt, data_.length() + 1);
-//  JsonArray& root = jsonBuffer.parseArray(txt);
-//  //String a = root[0]["Soluong"];
-//  //Serial.println(a);
-//  int index = 0;
-//  while (root[index]) {
-//    String a = root[index]["Soluong"];
-//    //    int soluong = a.toInt();
-//    //    array_[index] = soluong;
-//    Serial.println(a);
-//    index++;
-//  }
-//}
 int get_soluong_json(String data_) {
   char txt1[data_.length() + 1];
   DynamicJsonBuffer jsonBuffer1(data_.length() + 1);
@@ -318,8 +285,8 @@ void check_() {
   if ( (soluong_mysql_check > 0) && (soluong_mysql > 0) ) {
     
     if (soluong_mysql > soluong_mysql_check) soluong_mysql = soluong_mysql_check;
-    Serial.print(soluong_mysql);
-    Serial.println(soluong_mysql_check);
+    //Serial.print(soluong_mysql);
+    //Serial.println(soluong_mysql_check);
     if (soluong_mysql < soluong_mysql_check) {
       Serial.println("Thuc hien ham cho an");
 
@@ -337,136 +304,4 @@ void check_() {
     }
   }
 
-}
-
-void parseData(String buff) {
-  Serial.println(buff);
-
-  unsigned int len, index;
-  //--------------------------------------------------------------------
-  //Xóa lệnh AT từ chuỗi trả về.
-  index = buff.indexOf("\r");
-  buff.remove(0, index + 2);
-  buff.trim();
-  //--------------------------------------------------------------------
-
-  //--------------------------------------------------------------------
-  if (buff != "OK") {
-    index = buff.indexOf(":");
-    String cmd = buff.substring(0, index);
-    cmd.trim();
-
-    buff.remove(0, index + 2);
-
-    //____________________________________________________________
-    if (cmd == "+CMTI") {
-      //Lấy vị trí lưu tin nhắn
-      index = buff.indexOf(",");
-      String temp = buff.substring(index + 1, buff.length());
-      temp = "AT+CMGR=" + temp + "\r";
-      //Lấy giá trị tin nhắn
-      sim800.println(temp);
-    }
-    //____________________________________________________________
-    else if (cmd == "+CMGR") {
-      extractSms(buff);
-      Serial.println(msg);
-      String senderNumbernew = senderNumber.substring(0, 12);
-      Serial.println(senderNumbernew);
-      String choan = msg.substring(0, 6);
-      String soluong_string;
-      if (senderNumbernew == PHONE && choan == "cho an") {
-        for (int i = 7; i < msg.length(); i++)
-        {
-          soluong_string += msg[i];
-        }
-        //String soluong = msg.substring(7, msg.length());
-
-        //        char txt1[100];
-        //        soluong.toCharArray(txt1, soluong.length() + 1);
-        //        int soluong_int;
-        //        itoa(soluong_int,txt1,10);
-        int soluong = soluong_string.toInt();
-        if (soluong > 0) {
-          myservo.write(map(740, 0, 1023, 0, 180));
-          lcd.clear();
-          timer.disable(timerid1);
-          lcd.setCursor(0, 0);
-          lcd.print("Cho an");
-          int index = 6;
-          int docannang = 0;
-          while (docannang < soluong) {
-            docannang = get_cannang();
-            //Serial.println(docannang);
-            lcd.setCursor(index, 0);
-            lcd.print(".");
-            //delay(2000);
-            index++;
-
-          }
-          myservo.write(map(850, 0, 1023, 0, 180));
-          check_choan();
-          lcd.clear();
-          lcd.print("Da cho an");
-          delay(2000);
-          lcd.clear();
-          timer.enable(timerid1);
-        }
-        String url = "http://" + host + "/esp8266_channuoithongminh/insert_choan.php";
-        WiFiClient client;
-        if (!client.connect(host, 80)) {
-          Serial.println("connection failed");
-          return;
-        }
-        client.print(String("GET " + url + "?") +
-                     ("&soluong=") + soluong +
-                     " HTTP/1.1\r\n" +
-                     "Host: " + host + "\r\n" +
-                     "Connection: close\r\n\r\n");
-        client.stop();
-        Reply("Cho an thanh cong");
-        soluong_mysql = get_soluong_json(getdata(url_choan));
-      }
-    }
-    //____________________________________________________________
-    //--------------------------------------------------------------------
-  }
-}
-void Reply(String text)
-{
-  if (text == "") {
-    return;
-  }
-  Serial.println(text);
-  sim800.print("AT+CMGF=1\r");
-  delay(1000);
-  sim800.print("AT+CMGS=\"" + PHONE + "\"\r");
-  delay(1000);
-  sim800.print(text);
-  delay(100);
-  sim800.write(0x1A);
-  delay(1000);
-  Serial.println("Đã gửi tin nhắn thành công");
-}
-void extractSms(String buff) {
-  unsigned int index;
-
-  index = buff.indexOf(",");
-  smsStatus = buff.substring(1, index - 1);
-  buff.remove(0, index + 2);
-
-  senderNumber = buff.substring(0, 13);
-  buff.remove(0, 19);
-
-  receivedDate = buff.substring(0, 20);
-  buff.remove(0, buff.indexOf("\r"));
-  buff.trim();
-
-  index = buff.indexOf("\n\r");
-  buff = buff.substring(0, index);
-  buff.trim();
-  msg = buff;
-  buff = "";
-  msg.toLowerCase();
-  Serial.println(msg);
 }
